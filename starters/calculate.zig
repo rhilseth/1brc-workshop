@@ -1,21 +1,19 @@
-pub fn main() !void {
-    var da = std.heap.DebugAllocator(.{}).init;
-    const alloc = da.allocator();
-    defer _ = da.deinit();
-    var aa = std.heap.ArenaAllocator.init(alloc);
-    const key_alloc = aa.allocator();
-    defer aa.deinit();
-    var file = try std.fs.cwd().openFile("measurements.txt", .{});
-    defer file.close();
-    var results = std.StringHashMap(StationData).init(alloc);
+pub fn main(init: std.process.Init) !void {
+    var file = try std.Io.Dir.cwd().openFile(init.io, "measurements.txt", .{});
+    defer file.close(init.io);
+    var results = std.StringHashMap(StationData).init(init.gpa);
     defer results.deinit();
 
-    var br = std.io.bufferedReader(file.reader());
-    var brr = br.reader();
-    var buf: [128]u8 = undefined;
-    while (try brr.readUntilDelimiterOrEof(&buf, '\n')) |line| {
-        const key = std.mem.sliceTo(line, ';');
-        const val = try std.fmt.parseFloat(f64, line[key.len + 1 ..]);
+    var read_buffer: [8192]u8 = undefined;
+    var file_reader = file.readerStreaming(init.io, &read_buffer);
+    var reader = &file_reader.interface;
+    var line_buffer: [128]u8 = undefined;
+    while (true) {
+        var line = std.Io.Writer.fixed(&line_buffer);
+        _ = reader.streamDelimiter(&line, '\n') catch break;
+        _ = try reader.take(1);
+        const key = std.mem.sliceTo(line.buffered(), ';');
+        const val = try std.fmt.parseFloat(f64, line.buffered()[key.len + 1 ..]);
         var entry = try results.getOrPutAdapted(key, results.ctx);
         if (entry.found_existing) {
             entry.value_ptr.sum += val;
@@ -23,7 +21,7 @@ pub fn main() !void {
             entry.value_ptr.max = @max(entry.value_ptr.max, val);
             entry.value_ptr.count += 1;
         } else {
-            const alloc_key = try key_alloc.dupe(u8, key);
+            const alloc_key = try init.arena.allocator().dupe(u8, key);
             entry.key_ptr.* = alloc_key;
             entry.value_ptr.sum = val;
             entry.value_ptr.min = val;
@@ -34,7 +32,14 @@ pub fn main() !void {
 
     var it = results.iterator();
     while (it.next()) |entry| {
-        std.debug.print("{s};{}\n", .{ entry.key_ptr.*, entry.value_ptr });
+        const v = entry.value_ptr;
+        const avg = v.sum / @as(f64, @floatFromInt(v.count));
+        std.debug.print("{s};{d:0.1};{d:0.1};{d:0.1}\n", .{
+            entry.key_ptr.*,
+            v.min,
+            avg,
+            v.max,
+        });
     }
 }
 

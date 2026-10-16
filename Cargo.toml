@@ -1,0 +1,9 @@
+[package]
+name = "onebrc"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+memmap = "0.7.0"
+rayon = "1.12.0"
+

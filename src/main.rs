@@ -5,8 +5,11 @@ use std::io::Result;
 
 //use rayon::prelude::*;
 
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq)]
+struct Measurement(i16);
+
 fn main() -> Result<()> {
-    let mut measurements: HashMap<&str, Vec<i16>> = HashMap::new();
+    let mut measurements: HashMap<&str, Vec<Measurement>> = HashMap::new();
 
     let name = std::env::args().nth(1).expect("Expected filename");
     let file = File::open(name)?;
@@ -40,7 +43,16 @@ fn main() -> Result<()> {
         measurements
             .entry(name)
             .or_default()
-            .push(fixed_measurement);
+            .push(Measurement(fixed_measurement));
+    }
+
+    for (name, measurements) in measurements {
+        let min = measurements.iter().min().unwrap();
+        let avg =
+            Measurement(measurements.iter().map(|m| m.0).sum::<i16>() / measurements.len() as i16);
+        let max = measurements.iter().max().unwrap();
+
+        println!("{};{:?};{:?};{:?}", name, min, avg, max);
     }
 
     Ok(())

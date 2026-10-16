@@ -20,7 +20,12 @@ impl Display for Measurement {
 fn main() -> Result<()> {
     let mut measurements: HashMap<&str, Vec<Measurement>> = HashMap::new();
 
-    let name = std::env::args().nth(1).expect("Expected filename");
+    let name = if std::env::args().len() == 1 {
+        "measurements.txt".to_string()
+    } else {
+        std::env::args().nth(1).expect("Expected filename")
+    };
+
     let file = File::open(name)?;
     let mmap = unsafe { MmapOptions::new().map(&file)? };
 

@@ -1,5 +1,6 @@
 use memmap::MmapOptions;
 use std::collections::HashMap;
+use std::fmt::Display;
 use std::fs::File;
 use std::io::Result;
 
@@ -7,6 +8,14 @@ use std::io::Result;
 
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq)]
 struct Measurement(i16);
+
+impl Display for Measurement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let (i, d) = ((self.0 / 10).abs(), (self.0 % 10).abs());
+        let sign = if self.0.is_negative() { "-" } else { "" };
+        write!(f, "{}{}.{}", sign, i, d)
+    }
+}
 
 fn main() -> Result<()> {
     let mut measurements: HashMap<&str, Vec<Measurement>> = HashMap::new();
@@ -52,7 +61,7 @@ fn main() -> Result<()> {
             Measurement(measurements.iter().map(|m| m.0).sum::<i16>() / measurements.len() as i16);
         let max = measurements.iter().max().unwrap();
 
-        println!("{};{:?};{:?};{:?}", name, min, avg, max);
+        println!("{};{};{};{}", name, min, avg, max);
     }
 
     Ok(())

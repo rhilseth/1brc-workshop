@@ -1,6 +1,5 @@
 use fxhash::FxHashMap;
 use memmap::MmapOptions;
-use std::collections::HashMap;
 use std::fmt::Display;
 use std::fs::File;
 use std::io::Result;
@@ -76,8 +75,6 @@ impl AddAssign<Accumulated> for Accumulated {
 }
 
 fn main() -> Result<()> {
-    let measurements: HashMap<&str, Vec<Measurement>> = HashMap::new();
-
     let name = if std::env::args().len() == 1 {
         "measurements.txt".to_string()
     } else {
@@ -89,7 +86,7 @@ fn main() -> Result<()> {
 
     let buffer = &mmap[..];
 
-    buffer
+    let measurements = buffer
         .par_split(|&b| b == b'\n')
         .filter(|line| line.len() > 0)
         .fold(FxHashMap::default, |mut acc, line| {
@@ -114,15 +111,12 @@ fn main() -> Result<()> {
                 acc1.entry(k).and_modify(|acc| *acc += v).or_insert(v);
             }
             acc1
-        });
+        })
+        .unwrap();
 
-    for (name, measurements) in measurements {
-        let min = measurements.iter().min().unwrap();
-        let avg =
-            Measurement(measurements.iter().map(|m| m.0).sum::<i16>() / measurements.len() as i16);
-        let max = measurements.iter().max().unwrap();
-
-        println!("{};{};{};{}", name, min, avg, max);
+    for (name, accumulated) in measurements {
+        let avg = accumulated.total.0 / accumulated.count as i16;
+        println!("{};{};{};{}", name, accumulated.min, avg, accumulated.max);
     }
 
     Ok(())

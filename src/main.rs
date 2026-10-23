@@ -11,20 +11,36 @@ use rayon::prelude::*;
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Copy, Clone)]
 struct Measurement(i16);
 
-#[derive(Clone, Copy)]
-struct Accumulated {
-    min: Measurement,
-    max: Measurement,
-    total: Measurement,
-    count: usize,
-}
-
 impl Display for Measurement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let (i, d) = ((self.0 / 10).abs(), (self.0 % 10).abs());
         let sign = if self.0.is_negative() { "-" } else { "" };
         write!(f, "{}{}.{}", sign, i, d)
     }
+}
+
+impl Measurement {
+    fn parse(buf: &[u8]) -> Measurement {
+        let dot_offset = buf.iter().position(|x| *x == b'.').unwrap();
+
+        let fixed_int: i16 = unsafe { str::from_utf8_unchecked(&buf[..dot_offset]) }
+            .parse()
+            .unwrap();
+
+        let fixed_dec: i16 = unsafe { str::from_utf8_unchecked(&buf[dot_offset + 1..]) }
+            .parse()
+            .unwrap();
+
+        Measurement(fixed_int * 10 + fixed_dec)
+    }
+}
+
+#[derive(Clone, Copy)]
+struct Accumulated {
+    min: Measurement,
+    max: Measurement,
+    total: Measurement,
+    count: usize,
 }
 
 impl AddAssign<Measurement> for Measurement {
@@ -83,20 +99,7 @@ fn main() -> Result<()> {
 
             let name = unsafe { str::from_utf8_unchecked(&line[..offset]) };
 
-            let measurement_raw = &line[offset + 1..];
-            let dot_offset = measurement_raw.iter().position(|x| *x == b'.').unwrap();
-
-            let fixed_int: i16 =
-                unsafe { str::from_utf8_unchecked(&measurement_raw[..dot_offset]) }
-                    .parse()
-                    .unwrap();
-
-            let fixed_dec: i16 =
-                unsafe { str::from_utf8_unchecked(&measurement_raw[dot_offset + 1..]) }
-                    .parse()
-                    .unwrap();
-
-            let measurement = Measurement(fixed_int * 10 + fixed_dec);
+            let measurement = Measurement::parse(&line[offset + 1..]);
 
             *acc.entry(name).or_insert(Accumulated {
                 min: measurement,

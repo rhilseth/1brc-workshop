@@ -3,11 +3,20 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use std::fs::File;
 use std::io::Result;
+use std::ops::AddAssign;
 
-//use rayon::prelude::*;
+use rayon::prelude::*;
 
-#[derive(Debug, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Copy, Clone)]
 struct Measurement(i16);
+
+#[derive(Clone, Copy)]
+struct Accumulated {
+    min: Measurement,
+    max: Measurement,
+    total: Measurement,
+    count: usize,
+}
 
 impl Display for Measurement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -17,8 +26,40 @@ impl Display for Measurement {
     }
 }
 
+impl AddAssign<Measurement> for Measurement {
+    fn add_assign(&mut self, rhs: Measurement) {
+        self.0 += rhs.0;
+    }
+}
+
+impl AddAssign<Measurement> for Accumulated {
+    fn add_assign(&mut self, rhs: Measurement) {
+        if rhs < self.min {
+            self.min = rhs;
+        }
+        if rhs > self.max {
+            self.max = rhs;
+        }
+        self.total += rhs;
+        self.count += 1;
+    }
+}
+
+impl AddAssign<Accumulated> for Accumulated {
+    fn add_assign(&mut self, rhs: Accumulated) {
+        if rhs.min < self.min {
+            self.min = rhs.min;
+        }
+        if rhs.max > self.max {
+            self.max = rhs.max;
+        }
+        self.total += rhs.total;
+        self.count += rhs.count;
+    }
+}
+
 fn main() -> Result<()> {
-    let mut measurements: HashMap<&str, Vec<Measurement>> = HashMap::new();
+    let measurements: HashMap<&str, Vec<Measurement>> = HashMap::new();
 
     let name = if std::env::args().len() == 1 {
         "measurements.txt".to_string()
@@ -31,34 +72,45 @@ fn main() -> Result<()> {
 
     let buffer = &mmap[..];
 
-    for line in buffer.split(|&b| b == b'\n').map(|line| line) {
-        let offset_opt = line.iter().position(|x| *x == b';');
-        if offset_opt.is_none() {
-            continue;
-        }
-        let offset = offset_opt.unwrap();
+    buffer
+        .par_split(|&b| b == b'\n')
+        .filter(|line| line.len() > 0)
+        .fold(HashMap::new, |mut acc, line| {
+            let offset_opt = line.iter().position(|x| *x == b';');
 
-        let name = unsafe { str::from_utf8_unchecked(&line[..offset]) };
+            let offset = offset_opt.unwrap();
 
-        let measurement_raw = &line[offset + 1..];
-        let dot_offset = measurement_raw.iter().position(|x| *x == b'.').unwrap();
+            let name = unsafe { str::from_utf8_unchecked(&line[..offset]) };
 
-        let fixed_int: i16 = unsafe { str::from_utf8_unchecked(&measurement_raw[..dot_offset]) }
-            .parse()
-            .unwrap();
+            let measurement_raw = &line[offset + 1..];
+            let dot_offset = measurement_raw.iter().position(|x| *x == b'.').unwrap();
 
-        let fixed_dec: i16 =
-            unsafe { str::from_utf8_unchecked(&measurement_raw[dot_offset + 1..]) }
-                .parse()
-                .unwrap();
+            let fixed_int: i16 =
+                unsafe { str::from_utf8_unchecked(&measurement_raw[..dot_offset]) }
+                    .parse()
+                    .unwrap();
 
-        let fixed_measurement = fixed_int * 10 + fixed_dec;
+            let fixed_dec: i16 =
+                unsafe { str::from_utf8_unchecked(&measurement_raw[dot_offset + 1..]) }
+                    .parse()
+                    .unwrap();
 
-        measurements
-            .entry(name)
-            .or_default()
-            .push(Measurement(fixed_measurement));
-    }
+            let measurement = Measurement(fixed_int * 10 + fixed_dec);
+
+            *acc.entry(name).or_insert(Accumulated {
+                min: measurement,
+                max: measurement,
+                total: measurement,
+                count: 0,
+            }) += measurement;
+            acc
+        })
+        .reduce_with(|mut acc1, acc2| {
+            for (k, v) in acc2 {
+                acc1.entry(k).and_modify(|acc| *acc += v).or_insert(v);
+            }
+            acc1
+        });
 
     for (name, measurements) in measurements {
         let min = measurements.iter().min().unwrap();

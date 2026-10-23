@@ -1,3 +1,4 @@
+use fxhash::FxHashMap;
 use memmap::MmapOptions;
 use std::collections::HashMap;
 use std::fmt::Display;
@@ -75,7 +76,7 @@ fn main() -> Result<()> {
     buffer
         .par_split(|&b| b == b'\n')
         .filter(|line| line.len() > 0)
-        .fold(HashMap::new, |mut acc, line| {
+        .fold(FxHashMap::default, |mut acc, line| {
             let offset_opt = line.iter().position(|x| *x == b';');
 
             let offset = offset_opt.unwrap();

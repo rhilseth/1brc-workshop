@@ -1,5 +1,5 @@
 use fxhash::FxHashMap;
-use memmap::MmapOptions;
+use memmap2::MmapOptions;
 use std::fmt::Display;
 use std::fs::File;
 use std::io::Result;

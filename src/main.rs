@@ -20,7 +20,7 @@ impl Display for Measurement {
 
 impl Measurement {
     fn parse(buf: &[u8]) -> Measurement {
-        let dot_offset = buf.iter().position(|x| *x == b'.').unwrap();
+        let dot_offset = memchr::memchr(b'.', &buf).unwrap();
 
         let fixed_int: i16 = unsafe { str::from_utf8_unchecked(&buf[..dot_offset]) }
             .parse()
@@ -110,9 +110,7 @@ fn main() -> Result<()> {
                 if line.len() == 0 {
                     continue;
                 }
-                let offset_opt = line.iter().position(|x| *x == b';');
-
-                let offset = offset_opt.unwrap();
+                let offset = memchr::memchr(b';', &line).unwrap();
 
                 let name = unsafe { str::from_utf8_unchecked(&line[..offset]) };
 

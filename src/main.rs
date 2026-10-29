@@ -1,3 +1,4 @@
+#![feature(int_from_ascii)]
 use fxhash::FxHashMap;
 use memmap2::MmapOptions;
 use std::fmt::Display;
@@ -21,14 +22,8 @@ impl Display for Measurement {
 impl Measurement {
     fn parse(buf: &[u8]) -> Measurement {
         let dot_offset = memchr::memchr(b'.', &buf).unwrap();
-
-        let fixed_int: i16 = unsafe { str::from_utf8_unchecked(&buf[..dot_offset]) }
-            .parse()
-            .unwrap();
-
-        let fixed_dec: i16 = unsafe { str::from_utf8_unchecked(&buf[dot_offset + 1..]) }
-            .parse()
-            .unwrap();
+        let fixed_int: i16 = i16::from_ascii_bytes(&buf[..dot_offset]).unwrap();
+        let fixed_dec: i16 = i16::from_ascii_bytes(&buf[dot_offset + 1..]).unwrap();
 
         Measurement(fixed_int * 10 + fixed_dec)
     }

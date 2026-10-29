@@ -86,24 +86,45 @@ fn main() -> Result<()> {
 
     let buffer = &mmap[..];
 
-    let measurements = buffer
-        .par_split(|&b| b == b'\n')
-        .filter(|line| line.len() > 0)
-        .fold(FxHashMap::default, |mut acc, line| {
-            let offset_opt = line.iter().position(|x| *x == b';');
+    let mut chunks: Vec<&[u8]> = Vec::new();
+    let threads = std::thread::available_parallelism().unwrap().into();
 
-            let offset = offset_opt.unwrap();
+    let chunk_size = buffer.len() / threads;
 
-            let name = unsafe { str::from_utf8_unchecked(&line[..offset]) };
+    let mut next_start = 0;
+    for _ in 0..threads {
+        let chunk = &buffer[next_start..];
+        let mut end = chunk_size;
+        let extra = chunk[end..].iter().position(|c| *c == b'\n').unwrap();
+        end += extra;
+        let chunk = &chunk[..end];
+        chunks.push(chunk);
+        next_start = end;
+    }
 
-            let measurement = Measurement::parse(&line[offset + 1..]);
+    let measurements = chunks
+        .par_iter()
+        .map(|chunk| {
+            let mut acc = FxHashMap::default();
+            for line in chunk.split(|&b| b == b'\n').map(|line| line) {
+                if line.len() == 0 {
+                    continue;
+                }
+                let offset_opt = line.iter().position(|x| *x == b';');
 
-            *acc.entry(name).or_insert(Accumulated {
-                min: measurement,
-                max: measurement,
-                total: measurement,
-                count: 0,
-            }) += measurement;
+                let offset = offset_opt.unwrap();
+
+                let name = unsafe { str::from_utf8_unchecked(&line[..offset]) };
+
+                let measurement = Measurement::parse(&line[offset + 1..]);
+
+                *acc.entry(name).or_insert(Accumulated {
+                    min: measurement,
+                    max: measurement,
+                    total: measurement,
+                    count: 0,
+                }) += measurement;
+            }
             acc
         })
         .reduce_with(|mut acc1, acc2| {
@@ -114,7 +135,10 @@ fn main() -> Result<()> {
         })
         .unwrap();
 
-    for (name, accumulated) in measurements {
+    let mut sorted: Vec<(&&str, &Accumulated)> = measurements.iter().collect();
+    sorted.sort_by_key(|&(key, _value)| key);
+
+    for (name, accumulated) in sorted {
         let avg = accumulated.total.0 / accumulated.count as i16;
         println!("{};{};{};{}", name, accumulated.min, avg, accumulated.max);
     }

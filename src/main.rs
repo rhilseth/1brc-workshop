@@ -43,17 +43,16 @@ impl AddAssign<Measurement> for Measurement {
     }
 }
 
-impl AddAssign<Measurement> for Accumulated {
-    fn add_assign(&mut self, rhs: Measurement) {
-        if rhs < self.min {
-            self.min = rhs;
-        }
-        if rhs > self.max {
-            self.max = rhs;
-        }
-        self.total += rhs;
-        self.count += 1;
+#[inline]
+fn add_measurement(lhs: &mut Accumulated, rhs: Measurement) {
+    if rhs < lhs.min {
+        lhs.min = rhs;
     }
+    if rhs > lhs.max {
+        lhs.max = rhs;
+    }
+    lhs.total += rhs;
+    lhs.count += 1;
 }
 
 #[inline]
@@ -109,12 +108,15 @@ fn main() -> Result<()> {
 
                     let measurement = Measurement::parse(&line[offset + 1..]);
 
-                    *acc.entry(name).or_insert(Accumulated {
-                        min: measurement,
-                        max: measurement,
-                        total: measurement,
-                        count: 0,
-                    }) += measurement;
+                    add_measurement(
+                        acc.entry(name).or_insert(Accumulated {
+                            min: measurement,
+                            max: measurement,
+                            total: measurement,
+                            count: 0,
+                        }),
+                        measurement,
+                    );
                 }
             }
             acc

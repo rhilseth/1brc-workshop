@@ -56,17 +56,16 @@ impl AddAssign<Measurement> for Accumulated {
     }
 }
 
-impl AddAssign<Accumulated> for Accumulated {
-    fn add_assign(&mut self, rhs: Accumulated) {
-        if rhs.min < self.min {
-            self.min = rhs.min;
-        }
-        if rhs.max > self.max {
-            self.max = rhs.max;
-        }
-        self.total += rhs.total;
-        self.count += rhs.count;
+#[inline]
+fn add_assign(lhs: &mut Accumulated, rhs: &Accumulated) {
+    if rhs.min < lhs.min {
+        lhs.min = rhs.min;
     }
+    if rhs.max > lhs.max {
+        lhs.max = rhs.max;
+    }
+    lhs.total += rhs.total;
+    lhs.count += rhs.count;
 }
 
 fn main() -> Result<()> {
@@ -122,7 +121,9 @@ fn main() -> Result<()> {
         })
         .reduce_with(|mut acc1, acc2| {
             for (k, v) in acc2 {
-                acc1.entry(k).and_modify(|acc| *acc += v).or_insert(v);
+                acc1.entry(k)
+                    .and_modify(|acc| add_assign(acc, &v))
+                    .or_insert(v);
             }
             acc1
         })

@@ -132,7 +132,7 @@ fn main() -> Result<()> {
     sorted.sort_by_key(|&(key, _value)| key);
 
     for (name, accumulated) in sorted {
-        let avg = accumulated.total.0 / accumulated.count as i32;
+        let avg = Measurement(accumulated.total.0 / accumulated.count as i32);
         println!("{};{};{};{}", name, accumulated.min, avg, accumulated.max);
     }
 

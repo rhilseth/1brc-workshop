@@ -8,7 +8,7 @@ use std::io::Result;
 use rayon::prelude::*;
 
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Copy, Clone)]
-struct Measurement(i32);
+struct Measurement(i16);
 
 impl Display for Measurement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -21,8 +21,8 @@ impl Display for Measurement {
 impl Measurement {
     fn parse(buf: &[u8]) -> Measurement {
         let dot_offset = memchr::memchr(b'.', &buf).unwrap();
-        let fixed_int: i32 = i32::from_ascii_bytes(&buf[..dot_offset]).unwrap();
-        let fixed_dec: i32 = i32::from_ascii_bytes(&buf[dot_offset + 1..]).unwrap();
+        let fixed_int = i16::from_ascii_bytes(&buf[..dot_offset]).unwrap();
+        let fixed_dec = i16::from_ascii_bytes(&buf[dot_offset + 1..]).unwrap();
 
         Measurement(fixed_int * 10 + fixed_dec)
     }
@@ -32,7 +32,7 @@ impl Measurement {
 struct Accumulated {
     min: Measurement,
     max: Measurement,
-    total: Measurement,
+    total: i32,
     count: usize,
 }
 
@@ -44,7 +44,7 @@ fn add_measurement(lhs: &mut Accumulated, rhs: Measurement) {
     if rhs > lhs.max {
         lhs.max.0 = rhs.0;
     }
-    lhs.total.0 += rhs.0;
+    lhs.total += rhs.0 as i32;
     lhs.count += 1;
 }
 
@@ -56,7 +56,7 @@ fn add_assign(lhs: &mut Accumulated, rhs: &Accumulated) {
     if rhs.max > lhs.max {
         lhs.max = rhs.max;
     }
-    lhs.total.0 += rhs.total.0;
+    lhs.total += rhs.total;
     lhs.count += rhs.count;
 }
 
@@ -105,7 +105,7 @@ fn main() -> Result<()> {
                         acc.entry(name).or_insert(Accumulated {
                             min: measurement,
                             max: measurement,
-                            total: measurement,
+                            total: measurement.0 as i32,
                             count: 0,
                         }),
                         measurement,
@@ -128,7 +128,7 @@ fn main() -> Result<()> {
     sorted.sort_by_key(|&(key, _value)| key);
 
     for (name, accumulated) in sorted {
-        let avg = Measurement(accumulated.total.0 / accumulated.count as i32);
+        let avg = Measurement((accumulated.total / accumulated.count as i32) as i16);
         println!("{};{};{};{}", name, accumulated.min, avg, accumulated.max);
     }
 

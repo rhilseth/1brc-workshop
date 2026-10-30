@@ -22,7 +22,7 @@ impl Measurement {
     fn parse(buf: &[u8]) -> Measurement {
         let dot_offset = memchr::memchr(b'.', &buf).unwrap();
         let fixed_int = i16::from_ascii_bytes(&buf[..dot_offset]).unwrap();
-        let fixed_dec = i16::from_ascii_bytes(&buf[dot_offset + 1..]).unwrap();
+        let fixed_dec = (buf[dot_offset + 1] - b'0') as i16;
 
         Measurement(fixed_int * 10 + fixed_dec)
     }

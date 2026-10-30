@@ -9,7 +9,7 @@ use std::ops::AddAssign;
 use rayon::prelude::*;
 
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Copy, Clone)]
-struct Measurement(i16);
+struct Measurement(i32);
 
 impl Display for Measurement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -22,8 +22,8 @@ impl Display for Measurement {
 impl Measurement {
     fn parse(buf: &[u8]) -> Measurement {
         let dot_offset = memchr::memchr(b'.', &buf).unwrap();
-        let fixed_int: i16 = i16::from_ascii_bytes(&buf[..dot_offset]).unwrap();
-        let fixed_dec: i16 = i16::from_ascii_bytes(&buf[dot_offset + 1..]).unwrap();
+        let fixed_int: i32 = i32::from_ascii_bytes(&buf[..dot_offset]).unwrap();
+        let fixed_dec: i32 = i32::from_ascii_bytes(&buf[dot_offset + 1..]).unwrap();
 
         Measurement(fixed_int * 10 + fixed_dec)
     }
@@ -105,18 +105,18 @@ fn main() -> Result<()> {
                 if line.len() == 0 {
                     continue;
                 }
-                let offset = memchr::memchr(b';', &line).unwrap();
+                if let Some(offset) = memchr::memchr(b';', &line) {
+                    let name = unsafe { str::from_utf8_unchecked(&line[..offset]) };
 
-                let name = unsafe { str::from_utf8_unchecked(&line[..offset]) };
+                    let measurement = Measurement::parse(&line[offset + 1..]);
 
-                let measurement = Measurement::parse(&line[offset + 1..]);
-
-                *acc.entry(name).or_insert(Accumulated {
-                    min: measurement,
-                    max: measurement,
-                    total: measurement,
-                    count: 0,
-                }) += measurement;
+                    *acc.entry(name).or_insert(Accumulated {
+                        min: measurement,
+                        max: measurement,
+                        total: measurement,
+                        count: 0,
+                    }) += measurement;
+                }
             }
             acc
         })
@@ -132,7 +132,7 @@ fn main() -> Result<()> {
     sorted.sort_by_key(|&(key, _value)| key);
 
     for (name, accumulated) in sorted {
-        let avg = accumulated.total.0 / accumulated.count as i16;
+        let avg = accumulated.total.0 / accumulated.count as i32;
         println!("{};{};{};{}", name, accumulated.min, avg, accumulated.max);
     }
 

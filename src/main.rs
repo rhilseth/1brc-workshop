@@ -4,7 +4,6 @@ use memmap2::MmapOptions;
 use std::fmt::Display;
 use std::fs::File;
 use std::io::Result;
-use std::ops::AddAssign;
 
 use rayon::prelude::*;
 
@@ -37,21 +36,15 @@ struct Accumulated {
     count: usize,
 }
 
-impl AddAssign<Measurement> for Measurement {
-    fn add_assign(&mut self, rhs: Measurement) {
-        self.0 += rhs.0;
-    }
-}
-
 #[inline]
 fn add_measurement(lhs: &mut Accumulated, rhs: Measurement) {
     if rhs < lhs.min {
         lhs.min = rhs;
     }
     if rhs > lhs.max {
-        lhs.max = rhs;
+        lhs.max.0 = rhs.0;
     }
-    lhs.total += rhs;
+    lhs.total.0 += rhs.0;
     lhs.count += 1;
 }
 
@@ -63,7 +56,7 @@ fn add_assign(lhs: &mut Accumulated, rhs: &Accumulated) {
     if rhs.max > lhs.max {
         lhs.max = rhs.max;
     }
-    lhs.total += rhs.total;
+    lhs.total.0 += rhs.total.0;
     lhs.count += rhs.count;
 }
 
